@@ -252,7 +252,9 @@ export default function ChatApp() {
       }
 
       // Create new connection
-      const wsUrl = `ws://52.66.116.15/c/ws/wsconnect/${token}`;
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const wsBase = apiBase.replace(/^http/, 'ws');
+      const wsUrl = `${wsBase}/ws/wsconnect/${token}`;
       globalWs = new WebSocket(wsUrl);
 
       // Connection opened

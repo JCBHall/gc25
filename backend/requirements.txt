@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+motor
+beanie
+PyJWT
+bcrypt
+celery[redis]
+redis
+google-generativeai
+langchain-core
+langchain-google-genai
+langgraph
+langgraph-checkpoint-sqlite
+google-ai-generativelanguage==0.6.15
+pydantic-settings
+reportlab

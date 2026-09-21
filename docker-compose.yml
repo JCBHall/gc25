@@ -1,7 +1,15 @@
 version: '3.8'
 
 services:
-  # Redis Instances
+  mongodb:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    networks:
+      - backend-network
+    volumes:
+      - mongodb-data:/data/db
+
   redis-main:
     image: redis:7-alpine
     ports:
@@ -16,88 +24,76 @@ services:
     volumes:
       - redis-main-data:/data
 
-  redis-alt:
-    image: redis:7-alpine
-    ports:
-      - "6380:6379"
-    networks:
-      - backend-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-    volumes:
-      - redis-alt-data:/data
-
-  # Backend Services
-  gc-auth-backend:
-    build: ./gc-auth-backend
+  backend:
+    build: ./backend
     ports:
       - "8000:8000"
     networks:
       - backend-network
     environment:
-      - REDIS_HOST=redis-main
-      - REDIS_PORT=6379
+      - MONGO_URI=mongodb://mongodb:27017/gc25
+      - REDIS_URL=redis://redis-main:6379/0
+      - FRONTEND_ORIGIN=http://localhost:3000
+    env_file:
+      - .env
     depends_on:
       redis-main:
         condition: service_healthy
+      mongodb:
+        condition: service_started
 
-  gc-chat-backend:
-    build: ./gc-chat-backend
-    ports:
-      - "8002:8002"
-    networks:
-      - backend-network
-
-  gc-schedule-backend:
-    build: ./gc-scheduler-backend
-    ports:
-      - "50051:50051"
+  celery_worker:
+    build: ./backend
+    command: ["celery", "-A", "celery_app.app", "worker", "--loglevel=info"]
     networks:
       - backend-network
     environment:
-      - REDIS_HOST=redis-alt
-      - REDIS_PORT=6379
+      - MONGO_URI=mongodb://mongodb:27017/gc25
+      - REDIS_URL=redis://redis-main:6379/0
+    env_file:
+      - .env
     depends_on:
-      redis-alt:
+      redis-main:
         condition: service_healthy
+      mongodb:
+        condition: service_started
+      backend:
+        condition: service_started
 
-  gc-update-backend:
-    build: ./gc-update-backend
-    ports:
-      - "50052:50052"
+  celery_beat:
+    build: ./backend
+    command: ["celery", "-A", "celery_app.app", "beat", "--loglevel=info"]
     networks:
       - backend-network
-
-  gc-report-backend:
-    build: ./gc-report-backend
-    ports:
-      - "8005:8005"
-    networks:
-      - backend-network
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/gc25
+      - REDIS_URL=redis://redis-main:6379/0
+    env_file:
+      - .env
+    depends_on:
+      redis-main:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      backend:
+        condition: service_started
 
   frontend:
-    build: ./opensoft
+    build: 
+      context: ./opensoft
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
       - "3000:3000"
     networks:
       - backend-network
-    environment:
-      - NEXT_PUBLIC_API_AUTH=http://gc-auth-backend:8000
-      - NEXT_PUBLIC_API_CHAT=http://gc-chat-backend:8002
-      - NEXT_PUBLIC_API_REPORT=http://gc-report-backend:8005
     depends_on:
-      - gc-auth-backend
-      - gc-chat-backend
-      - gc-report-backend
+      - backend
 
-# Network and Volume Configs
 networks:
   backend-network:
     driver: bridge
 
 volumes:
+  mongodb-data:
   redis-main-data:
-  redis-alt-data:

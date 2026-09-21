@@ -36,6 +36,6 @@ function getMoodColor(mood: string) {
   }
 }
 
-const baseURL = "http://52.66.116.15";
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export { getMoodColor, getMoodIcon, baseURL };
